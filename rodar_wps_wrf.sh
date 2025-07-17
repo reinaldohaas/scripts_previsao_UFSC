@@ -53,6 +53,31 @@ mkdir -p "$WPS_RUN_DIR"
 mkdir -p "$WRF_RUN_DIR"
 
 # ========================================
+# VERIFICAÇÃO DE SAÍDAS WRF EXISTENTES
+# ========================================
+echo -e "\n>> Verificando arquivos WRF de saída existentes para a data ${DATE}..."
+# Verifica se existem arquivos wrfout para d01 E d02 e se ambos são não-vazios
+# 'find ... -size +0 -print -quit' retorna o nome do primeiro arquivo não-vazio e sai do find.
+# 'grep -q .' verifica se algo foi retornado (i.e., um arquivo não-vazio foi encontrado).
+if find "$WRF_RUN_DIR" -maxdepth 1 -name "wrfout_d01_*" -size +0 -print -quit | grep -q . && \
+   find "$WRF_RUN_DIR" -maxdepth 1 -name "wrfout_d02_*" -size +0 -print -quit | grep -q .; then
+    echo "✔️ Arquivos wrfout_d01* e wrfout_d02* já existem e não estão vazios em $WRF_RUN_DIR."
+    echo "Pulando a execução completa da cadeia WPS-WRF para evitar reprocessamento desnecessário."
+    exit 0 # Sai do script com sucesso
+elif (ls "$WRF_RUN_DIR"/wrfout_d01_* 1> /dev/null 2>&1 || ls "$WRF_RUN_DIR"/wrfout_d02_* 1> /dev/null 2>&1); then
+    # Se algum dos arquivos existe mas a condição acima falhou (i.e., estão vazios ou um deles não existe)
+    echo "⚠️ Alguns arquivos wrfout (d01 ou d02) foram encontrados, mas podem estar incompletos ou vazios."
+    echo "Prosseguindo com a execução para garantir a geração correta."
+    # Opcional: Você pode adicionar aqui uma lógica para limpar os arquivos incompletos/vazios
+    # find "$WRF_RUN_DIR" -maxdepth 1 -name "wrfout_d01_*" -size 0 -delete
+    # find "$WRF_RUN_DIR" -maxdepth 1 -name "wrfout_d02_*" -size 0 -delete
+else
+    echo "ℹ️ Nenhum arquivo wrfout (d01 ou d02) encontrado para a data ${DATE}."
+    echo "Prosseguindo com a execução completa da cadeia WPS-WRF."
+fi
+
+
+# ========================================
 # ETAPA WPS (WRF Preprocessing System)
 # ========================================
 echo -e "\n>> 2. INICIANDO ETAPA WPS EM: $WPS_RUN_DIR"
@@ -183,4 +208,3 @@ echo "      ✔️  wrf.exe concluído com sucesso."
 echo -e "\n🎉🎉🎉 CADEIA WPS-WRF EXECUTADA COM SUCESSO! 🎉🎉🎉"
 echo '> Os arquivos de saída (wrfout) estão localizados em:'
 echo "   $WRF_RUN_DIR"
-

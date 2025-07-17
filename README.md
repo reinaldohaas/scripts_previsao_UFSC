@@ -11,14 +11,15 @@ A cadeia de execução é dividida nas seguintes etapas principais:
 2.  **Execução do WRF:** Rodada do WPS (WRF Preprocessing System) e do próprio WRF.
 3.  **Pós-processamento e Geração de Produtos:** Criação de imagens a partir das saídas brutas do modelo.
 4.  **Publicação Web:** Geração de um visualizador HTML/JavaScript para os resultados.
+5.  **Orquestração e Agendamento:** Gerenciamento do fluxo de trabalho e automação das execuções diárias.
 
 ### 2. Arquitetura e Fluxo de Execução
 
-O sistema opera através da execução sequencial de scripts de shell e Python. A orquestração geral é gerenciada por um script mestre (`rodada_diaria.sh`) que invoca os demais componentes.
+O sistema opera através da execução sequencial de scripts de shell e Python. A orquestração geral é gerenciada por um script mestre unificado (`executar_tudo.sh`) que invoca os demais componentes em ordem. Este script mestre é, por sua vez, agendado para execução automática via `cron`.
 
 O fluxo de dados pode ser resumido da seguinte forma:
 
-`URLs ICON` -> **Download & Regrid** -> `GRIB2 ICON (regional)` -> **WPS** -> `met_em*` -> **WRF (real.exe, wrf.exe)** -> `wrfout*` -> **Plotagem (wrfplot)** -> `Imagens PNG` -> **Gerador de Interface** -> `Visualizador Web (HTML/JS)`
+`CRON` -> `executar_tudo.sh` -> (`trazer_icon_sul_br.sh` -> `URLs ICON` -> **Download & Regrid** -> `GRIB2 ICON (regional)`) -> (`rodar_wps_wrf.sh` -> **WPS** -> `met_em*` -> **WRF (real.exe, wrf.exe)** -> `wrfout*`) -> (`plotar_rodadas_diaria.sh` -> **Plotagem (wrfplot)** -> `Imagens PNG`) -> (`orquestrador_web.py` -> **Gerador de Interface** -> `Visualizador Web (HTML/JS)`)
 
 ### 3. Detalhamento das Etapas e Scripts
 
@@ -68,14 +69,15 @@ Esta etapa é responsável por obter os dados meteorológicos que servirão de e
 O coração do sistema, onde a simulação numérica é de fato realizada.
 
 * **`rodar_wps_wrf.sh`**:
-    * **Propósito**: Automatizar a execução completa da cadeia WPS-WRF.
+    * **Propósito**: Automatizar a execução completa da cadeia WPS-WRF. Este script também verifica a existência e integridade dos arquivos de saída WRF (`wrfout_d01*` e `wrfout_d02*`) e evita a reexecução desnecessária se eles já estiverem presentes e não vazios.
     * **Funcionamento**:
         1.  **Configuração**: Define os diretórios de trabalho e as datas de início e fim da simulação com base na data da rodada.
-        2.  **Execução do WPS**:
+        2.  **Verificação de Saída**: Checa se os arquivos `wrfout` já existem e não estão vazios; se sim, o script é encerrado.
+        3.  **Execução do WPS**:
             * **`geogrid.exe`**: Interpola dados geográficos estáticos (topografia, uso do solo, etc.) para os domínios do modelo definidos no `namelist.wps`.
             * **`ungrib.exe`**: Lê os arquivos GRIB2 do ICON e extrai as variáveis meteorológicas. Utiliza um `Vtable` (Variable Table), especificamente `Vtable.ICONp`, para mapear os nomes das variáveis do ICON para os nomes esperados pelo WRF.
             * **`metgrid.exe`**: Interpola os campos meteorológicos extraídos pelo `ungrib` para os domínios do modelo, criando os arquivos `met_em.d*.nc`.
-        3.  **Execução do WRF**:
+        4.  **Execução do WRF**:
             * **`real.exe`**: Prepara as condições iniciais (`wrfinput_d01`) e de fronteira (`wrfbdy_d01`) a partir dos dados do `metgrid`. As datas e outros parâmetros físicos são lidos do `namelist.input`.
             * **`wrf.exe`**: O solver principal do modelo. Integra as equações atmosféricas no tempo para gerar a previsão. A execução é feita em paralelo usando `mpirun`.
     * **Saída**: Os arquivos `wrfout_d*`, que contêm a previsão completa em formato NetCDF.
@@ -84,8 +86,8 @@ O coração do sistema, onde a simulação numérica é de fato realizada.
 
 Esta etapa traduz os dados brutos do `wrfout` em produtos visuais compreensíveis.
 
-* **`rodada_diaria.sh`**:
-    * **Propósito**: Script mestre que, além de chamar outros, gerencia a criação de imagens para a web.
+* **`plotar_rodadas_diaria.sh`**:
+    * **Propósito**: Gerencia a criação de imagens para a web a partir das saídas do WRF.
     * **Funcionamento**:
         1.  **Iteração**: Faz um loop sobre os domínios a serem plotados (e.g., `d01`, `d02`) e uma lista pré-definida de variáveis meteorológicas (e.g., `slp`, `mcape`, `winds`, `ppn`).
         2.  **Plotagem**: Para cada variável, invoca um script de plotagem customizado (`wrfplot`), passando o arquivo `wrfout` correspondente, a variável desejada, e um shapefile para sobrepor os contornos. A saída do `wrfplot` são imagens no formato PNG para cada passo de tempo.
@@ -97,15 +99,37 @@ Esta etapa traduz os dados brutos do `wrfout` em produtos visuais compreensívei
 
 A etapa final, que constrói a interface do usuário para explorar os resultados da previsão.
 
-* **`gerar_visualizador.py`**:
-    * **Propósito**: Criar uma interface web completa e interativa.
+* **`orquestrador_web.py`**:
+    * **Propósito**: Criar uma interface web completa e interativa para todas as rodadas de previsão disponíveis.
     * **Funcionamento**:
-        1.  **Análise de Dados**: O script varre a estrutura de diretórios de saída gerada pela `rodada_diaria.sh`.
-        2.  **Geração de `data.js`**: Cria um arquivo JavaScript que contém um objeto JSON. Este objeto mapeia cada domínio e variável a uma lista ordenada de caminhos para as imagens PNG correspondentes.
-        3.  **Geração de `index.html`**: Cria o arquivo HTML principal que serve como visualizador. Este arquivo contém:
-            * **HTML e CSS**: Estrutura e estilo da página.
-            * **JavaScript**: Lógica para a interatividade, incluindo:
-                * Menus para selecionar domínio e variável.
-                * Um `slider` e botões de `play/pause` para animar a sequência de imagens.
-                * Uma seção que exibe descrições detalhadas e o propósito de cada variável meteorológica selecionada, enriquecendo a experiência do usuário.
-    * **Saída**: Os arquivos `index.html` e `data.js`, que formam o visualizador web final a ser hospedado em um servidor.
+        1.  **Geração de Página Principal**: Encontra os diretórios de previsão existentes e gera um `index.html` principal com um calendário, permitindo a navegação entre as diferentes datas de previsão.
+        2.  **Geração de Visualizadores por Rodada**: Para cada rodada de previsão, gera os arquivos `data.js` e `index.html` necessários para o visualizador interativo. O `data.js` mapeia domínios e variáveis para os caminhos das imagens PNG correspondentes, suportando variáveis de nível único e de múltiplos níveis verticais.
+    * **Saída**: Os arquivos `index.html` e `data.js` para a página principal e para cada visualizador de rodada, a serem hospedados em um servidor web.
+
+#### 3.6. Orquestração e Agendamento
+
+Esta seção descreve o script mestre que coordena toda a cadeia de previsão e como ele é agendado para execução automática.
+
+* **`executar_tudo.sh`**:
+    * **Propósito**: É o script mestre que orquestra a execução sequencial de todas as etapas da cadeia de previsão. Ele garante que os dados sejam baixados, o modelo executado, os gráficos gerados e a interface web atualizada em uma única chamada.
+    * **Funcionamento**:
+        1.  Aceita opcionalmente uma data no formato `YYYYMMDDHH` como argumento. Se não fornecida, utiliza a data e hora UTC atuais (00Z).
+        2.  Chama em sequência:
+            * `trazer_icon_sul_br.sh` (para aquisição e regrade dos dados ICON).
+            * `rodar_wps_wrf.sh` (para execução do WPS e WRF).
+            * `plotar_rodadas_diaria.sh` (para plotagem das saídas do WRF).
+            * `orquestrador_web.py` (para geração e atualização da interface web).
+    * **Uso**: `./executar_tudo.sh [YYYYMMDDHH]`
+    * **Exemplo**: `./executar_tudo.sh 2025071700`
+
+* **Agendamento Cron (`crontab -l`)**:
+    * **Propósito**: O `crontab` é utilizado para agendar a execução automática do script `executar_tudo.sh` em intervalos regulares.
+    * **Configuração**: A linha abaixo no `crontab` do usuário `geral1` garante que o script seja executado a cada hora.
+        ```
+        1 * * * * /home/geral1/scripts_previsao_UFSC/executar_tudo.sh >> /dev/nul
+        ```
+        * `1`: O script será executado no minuto 1 de cada hora.
+        * `* * * *`: Indica que a execução ocorrerá em qualquer hora, qualquer dia do mês, qualquer mês e qualquer dia da semana.
+        * `/home/geral1/scripts_previsao_UFSC/executar_tudo.sh`: Caminho completo para o script mestre.
+        * `>> /dev/nul`: Redireciona a saída padrão e de erro para `/dev/nul` (provavelmente um erro de digitação e deveria ser `/dev/null`) para evitar que o `cron` envie e-mails com o log da execução.
+

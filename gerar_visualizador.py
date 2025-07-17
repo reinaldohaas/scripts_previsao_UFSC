@@ -291,12 +291,12 @@ HTML_TEMPLATE = """
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
-""".strip()  # você pode usar .strip() para tirar espaços em branco extras, se quiser
-'// ... (descrições serão inseridas aqui) ...',
-f'const variableDescriptions = {json.dumps(get_variable_descriptions(), indent=12)};'
+""".replace(
+    '// ... (descrições serão inseridas aqui) ...',
+    f'const variableDescriptions = {json.dumps(get_variable_descriptions(), indent=12)};'
+)
 
 
-# ... (o resto do script continua a partir daqui)
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Uso: python gerar_visualizador.py <caminho_para_diretorio_da_rodada>")

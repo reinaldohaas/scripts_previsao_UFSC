@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-ORQUESTRADOR WEB DE PREVISÃO DO TEMPO - UFSC (v4 - Correção de Formato de Data)
+ORQUESTRADOR WEB DE PREVISÃO DO TEMPO - UFSC (v5 - Regex Dinâmico e Robusto)
 
 Script unificado que:
 1. Gera a página principal com um calendário.
 2. Itera sobre cada rodada e gera um visualizador detalhado que suporta
-   corretamente variáveis de nível único e de múltiplos níveis.
+   corretamente variáveis de nível único e de múltiplos níveis, independentemente
+   do número de sublinhados no nome.
 
 Autor: Gemini AI / Reinaldo Haas
 Data da Modificação: 2025-07-17
@@ -141,36 +142,9 @@ def generate_main_index(root_path, forecasts):
         print(f"❌ ERRO ao gerar a página principal: {e}")
 
 # ==============================================================================
-# SEÇÃO 2: FUNÇÕES PARA O VISUALIZADOR (LÓGICA CORRIGIDA COM REGEX)
+# SEÇÃO 2: FUNÇÕES PARA O VISUALIZADOR (LÓGICA FINAL COM REGEX DINÂMICO)
 # ==============================================================================
 
-# Regex CORRIGIDO: Note o HH_MM no final
-ML_PATTERN = re.compile(r"^(.+?)_(\d+)_(\d{2}-\d{2}-\d{4}_\d{2}_\d{2})\.png$")
-SL_PATTERN = re.compile(r"^(.+?)_(\d{2}-\d{2}-\d{4}_\d{2}_\d{2})\.png$")
-
-def parse_info_from_filename(filename, is_multilevel):
-    """
-    Extrai informações (nível, data) de um nome de arquivo usando Regex.
-    Retorna uma tupla (nível, objeto_datetime).
-    """
-    pattern = ML_PATTERN if is_multilevel else SL_PATTERN
-    match = pattern.match(filename)
-    
-    if not match:
-        return None, datetime.min
-
-    try:
-        # Formato de data CORRIGIDO: %H_%M
-        datetime_format = '%d-%m-%Y_%H_%M'
-        if is_multilevel:
-            level = match.group(2)
-            datetime_obj = datetime.strptime(match.group(3), datetime_format)
-            return level, datetime_obj
-        else:
-            datetime_obj = datetime.strptime(match.group(2), datetime_format)
-            return None, datetime_obj
-    except (ValueError, IndexError):
-        return None, datetime.min
 def get_variable_descriptions():
     """Retorna um dicionário com as descrições detalhadas das variáveis."""
     return {
@@ -211,14 +185,13 @@ def get_variable_descriptions():
         "u_tv": "<b>Temperatura Virtual (Virtual Temperature)</b><br>A temperatura que o ar seco precisaria ter para ter a mesma densidade que o ar úmido na mesma pressão. É usada em cálculos de flutuabilidade e estabilidade que levam em conta a umidade.",
         "u_twb": "<b>Temperatura de Bulbo Úmido (Wet-Bulb Temperature)</b><br>A menor temperatura que o ar pode atingir por evaporação. É uma medida combinada de calor e umidade, importante para prever o tipo de precipitação (chuva, neve, chuva congelante).",
         "u_winds": "<b>Vento (Winds)</b><br>Velocidade e direção do vento em um determinado nível de pressão, geralmente visualizado com barbelas. Crucial para identificar os jatos de altos níveis (Jet Stream) e o cisalhamento do vento.",
+        "u_winds_temp": "<b>Vento e Temperatura (Winds and Temperature)</b><br>Sobreposição de isotermas (linhas de temperatura constante) e barbelas de vento. Permite a análise da advecção de temperatura (transporte de ar quente ou frio pelo vento).",
         "u_cin": "<b>Inibição Convectiva (Convective Inhibition)</b><br>Campo 3D de CIN, mostrando a energia que impede a convecção em diferentes níveis. Útil para ver a profundidade de uma camada de inversão ('tampa').",
         "u_cape": "<b>Energia Potencial Convectiva Disponível (CAPE)</b><br>Campo 3D de CAPE. Mostra a distribuição vertical da instabilidade. Uma parcela pode encontrar CAPE significativo apenas acima de uma inversão de baixos níveis, o que é importante para prever convecção elevada."
     }
 
-
-
 def generate_forecast_viewer(forecast_dir):
-    """Gera os arquivos do visualizador usando Regex para robustez."""
+    """Gera os arquivos do visualizador usando Regex dinâmico para máxima robustez."""
     print(f"  -> Processando visualizador para: {os.path.basename(forecast_dir)}")
     simulation_data = {}
     domains = [d for d in os.listdir(forecast_dir) if os.path.isdir(os.path.join(forecast_dir, d)) and d.startswith('d0')]
@@ -232,21 +205,40 @@ def generate_forecast_viewer(forecast_dir):
             
             is_multilevel = variable.startswith('u_')
             
+            # Formato de data e hora esperado nos nomes dos arquivos
+            datetime_format_str = r'\d{2}-\d{2}-\d{4}_\d{2}_\d{2}'
+            datetime_format_strptime = '%d-%m-%Y_%H_%M'
+
             if is_multilevel:
+                # Cria um padrão Regex específico para a variável atual
+                pattern = re.compile(f"^{re.escape(variable)}_(\\d+)_({datetime_format_str})\\.png$")
+                
                 levels_data = defaultdict(list)
                 for f in image_files:
-                    level, _ = parse_info_from_filename(f, is_multilevel=True)
-                    if level:
+                    match = pattern.match(f)
+                    if match:
+                        level = match.group(1)
                         levels_data[level].append(os.path.join(domain, variable, f))
                 
                 sorted_levels_data = {}
                 for level, files in levels_data.items():
-                    sorted_levels_data[level] = sorted(files, key=lambda f: parse_info_from_filename(os.path.basename(f), is_multilevel=True)[1])
+                    # Ordena usando o mesmo padrão para extrair a data
+                    sorted_levels_data[level] = sorted(
+                        files,
+                        key=lambda f: datetime.strptime(pattern.match(os.path.basename(f)).group(2), datetime_format_strptime)
+                    )
                 simulation_data[domain][variable] = sorted_levels_data
             else:
-                sorted_files = sorted(image_files, key=lambda f: parse_info_from_filename(f, is_multilevel=False)[1])
+                # Padrão para variáveis de nível único
+                pattern = re.compile(f"^{re.escape(variable)}_({datetime_format_str})\\.png$")
+                
+                sorted_files = sorted(
+                    image_files,
+                    key=lambda f: datetime.strptime(pattern.match(f).group(1), datetime_format_strptime) if pattern.match(f) else datetime.min
+                )
                 simulation_data[domain][variable] = [os.path.join(domain, variable, f) for f in sorted_files]
 
+    # --- Gera os arquivos data.js e index.html ---
     data_js_path = os.path.join(forecast_dir, 'data.js')
     with open(data_js_path, 'w', encoding='utf-8') as f:
         f.write("const simulationData = ")
@@ -262,8 +254,9 @@ def generate_forecast_viewer(forecast_dir):
     os.chmod(data_js_path, 0o644)
     os.chmod(viewer_html_path, 0o644)
 
+
 # ==============================================================================
-# TEMPLATE HTML PARA O VISUALIZADOR (JAVASCRIPT TAMBÉM CORRIGIDO)
+# TEMPLATE HTML PARA O VISUALIZADOR (Nenhuma alteração de lógica necessária aqui)
 # ==============================================================================
 HTML_TEMPLATE_VISUALIZADOR = """
 <!DOCTYPE html>
@@ -371,16 +364,20 @@ HTML_TEMPLATE_VISUALIZADOR = """
             currentVariable = variableSelect.value;
             updateDescription();
             const varData = simulationData[currentDomain][currentVariable];
-            if (Array.isArray(varData)) {
+            if (varData && Array.isArray(varData)) {
                 levelControlGroup.style.display = 'none';
                 currentLevel = null;
                 imagePaths = varData;
                 updateAnimationUI();
-            } else {
+            } else if (varData) {
                 levelControlGroup.style.display = 'flex';
                 const levels = Object.keys(varData).sort((a, b) => parseInt(b) - parseInt(a));
                 levelSelect.innerHTML = levels.map(l => `<option value="${l}">${l}</option>`).join('');
                 onLevelChange();
+            } else {
+                 levelControlGroup.style.display = 'none';
+                 imagePaths = [];
+                 updateAnimationUI();
             }
         }
         function onLevelChange() {
@@ -396,7 +393,7 @@ HTML_TEMPLATE_VISUALIZADOR = """
             updateDisplay();
         }
         function updateDisplay() {
-            if (imagePaths.length === 0) {
+            if (!imagePaths || imagePaths.length === 0) {
                 imageDisplay.src = "";
                 imageDisplay.alt = "Nenhuma imagem disponível para esta seleção.";
                 frameInfo.textContent = "Frame: 0/0 | Validade: --";
@@ -407,7 +404,7 @@ HTML_TEMPLATE_VISUALIZADOR = """
             const totalFrames = imagePaths.length;
             const filename = imagePaths[currentFrame].split('/').pop();
             const timeParts = filename.replace('.png','').split('_');
-            const timeStr = currentLevel ? timeParts.slice(2).join('_') : timeParts.slice(1).join('_');
+            const timeStr = currentLevel ? timeParts.slice(2).join('_').replace(/_/g, ':') : timeParts.slice(1).join('_').replace(/_/g, ':');
             const prefix = currentLevel ? `Nível ${currentLevel}hPa | ` : "";
             frameInfo.textContent = `${prefix}Frame: ${currentFrame + 1}/${totalFrames} | Validade: ${timeStr}`;
         }
