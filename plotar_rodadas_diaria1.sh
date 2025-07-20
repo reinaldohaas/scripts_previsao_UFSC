@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Adiciona esta linha para ativar o modo de depuração verboso
+#set -xv # Adiciona esta linha para ativar o modo de depuração verboso
 
 # ==============================================================================
 # SCRIPT MESTRE PARA A RODADA DIÁRIA DO MODELO WRF E PUBLICAÇÃO NA WEB
@@ -111,17 +111,7 @@ for domain in "${DOMAINS_TO_PLOT[@]}"; do
          else
            shapefile='/home/geral1/scripts_previsao_UFSC/SC_RS_d01/SC_RS_d01.shp' 
         fi
-
-        # ==============================================================================
-        # CONTROLE PARA EVITAR REPLOTAGEM SE OS ARQUIVOS PNG JÁ EXISTIREM
-        # ==============================================================================
-        if compgen -G "${domain_output_dir}/${variable}_*.png" > /dev/null; then
-           echo "  ✅ Arquivos de saída para '${variable}' já existem em ${domain_output_dir}. Pulando wrfplot."
-            echo "            '${variable}'," >> "$CONFIG_JS_FILE"
-           continue # Pula para a próxima variável se os PNGs já existem
-        fi
-        # ==============================================================================
-
+        # Executa o wrfplot e redireciona a saída para /dev/null para um log mais limpo
         echo wrfplot --shapefile $shapefile  --input "${wrf_file}" --vars "${variable}" --ulevels '900,500,200' --output "${domain_output_dir}" 
         wrfplot --shapefile  $shapefile   --input "${wrf_file}" --vars "${variable}" --ulevels '900,500,200' --output "${domain_output_dir}" >/dev/null 2>&1
 
