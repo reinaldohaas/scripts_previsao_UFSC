@@ -2,15 +2,16 @@
 # -*- coding: utf-8 -*-
 
 """
-ORQUESTRADOR WEB DE PREVISÃO DO TEMPO - UFSC (v4 - Correção de Formato de Data)
+ORQUESTRADOR WEB DE PREVISÃO DO TEMPO - UFSC (v5 - Adicionado Cabeçalho Institucional)
 
 Script unificado que:
-1. Gera a página principal com um calendário.
-2. Itera sobre cada rodada e gera um visualizador detalhado que suporta
-   corretamente variáveis de nível único e de múltiplos níveis.
+1. Adiciona um cabeçalho institucional com logo e informações da UFSC.
+2. Realiza o download do logo da UFSC se ele não existir localmente.
+3. Gera a página principal com um calendário de previsões.
+4. Gera um visualizador detalhado para cada rodada de previsão.
 
 Autor: Gemini AI / Reinaldo Haas
-Data da Modificação: 2025-07-17
+Data da Modificação: 2025-07-22
 """
 
 import os
@@ -21,9 +22,31 @@ import re
 from datetime import datetime, date
 import locale
 from collections import defaultdict
+import urllib.request
 
 # --- CONFIGURAÇÕES GLOBAIS ---
 WEB_ROOT = "/var/www/html"
+
+# ==============================================================================
+# SEÇÃO AUXILIAR: DOWNLOAD DE RECURSOS
+# ==============================================================================
+
+def ensure_logo_exists(target_dir):
+    """Verifica se o logo da UFSC existe e, se não, faz o download."""
+    logo_url = "https://upload.wikimedia.org/wikipedia/commons/6/6f/Brasao_UFSC_vertical_extenso.svg"
+    logo_filename = "Brasao_UFSC_vertical_extenso.svg"
+    logo_path = os.path.join(target_dir, logo_filename)
+
+    if not os.path.exists(logo_path):
+        print(f"-> Baixando o logo da UFSC para '{logo_path}'...")
+        try:
+            with urllib.request.urlopen(logo_url) as response, open(logo_path, 'wb') as out_file:
+                data = response.read()
+                out_file.write(data)
+            print("✅ Logo baixado com sucesso.")
+            os.chmod(logo_path, 0o644)
+        except Exception as e:
+            print(f"❌ ERRO ao baixar o logo: {e}")
 
 # ==============================================================================
 # SEÇÃO 1: FUNÇÕES PARA A PÁGINA PRINCIPAL (CALENDÁRIO)
@@ -77,8 +100,10 @@ def generate_calendar_html(year, month, forecasts, today):
     return html
 
 def generate_main_index(root_path, forecasts):
-    """Gera o arquivo index.html principal com o calendário."""
+    """Gera o arquivo index.html principal com o calendário e novo cabeçalho."""
     print(">> Gerando a página principal (index.html)...")
+    ensure_logo_exists(root_path) # Garante que o logo da UFSC está presente
+    
     today = date.today()
     calendar_html = generate_calendar_html(today.year, today.month, forecasts, today)
     main_page_html = f"""
@@ -91,6 +116,42 @@ def generate_main_index(root_path, forecasts):
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }}
         .container {{ max-width: 900px; margin: 20px auto; padding: 25px; background-color: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; }}
+        
+        /* --- NOVO CABEÇALHO INSTITUCIONAL --- */
+        .main-header {{
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }}
+        .main-header .logo-container {{
+            flex: 0 0 20%;
+            max-width: 120px;
+        }}
+        .main-header .logo-container img {{
+            width: 100%;
+            height: auto;
+        }}
+        .main-header .header-text {{
+            flex: 1;
+        }}
+        .header-text h2, .header-text p {{
+            margin: 0;
+            line-height: 1.3;
+        }}
+        .header-text h2 {{
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #000;
+        }}
+        .header-text p {{
+            font-size: 1em;
+            color: #444;
+        }}
+        /* --- FIM DO NOVO CABEÇALHO --- */
+        
         header {{ border-bottom: 2px solid #005a9c; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }}
         header h1 {{ color: #005a9c; margin: 0; }}
         a {{ color: #005a9c; text-decoration: none; }}
@@ -111,6 +172,17 @@ def generate_main_index(root_path, forecasts):
 </head>
 <body>
     <div class="container">
+        <div class="main-header">
+            <div class="logo-container">
+                <img src="Brasao_UFSC_vertical_extenso.svg" alt="Brasão da UFSC">
+            </div>
+            <div class="header-text">
+                <h2>Universidade Federal de Santa Catarina</h2>
+                <p>Centro de Ciências Físicas e Matemáticas (CFM)</p>
+                <p>Departamento de Física</p>
+            </div>
+        </div>
+
         <header>
             <h1>Previsão UFSC</h1>
             <p>Curso FSC7115 - Modelagem Numérica da Atmosfera</p>
@@ -470,3 +542,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
