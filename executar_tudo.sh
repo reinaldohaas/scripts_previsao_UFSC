@@ -54,6 +54,11 @@ echo -e "\n--- Executando orquestrador_web.py ---"
 python3 "$SCRIPTS_DIR/orquestrador_web.py"
 echo "orquestrador_web.py concluído."
 
+# 5. Executa o script de sync_html.sh
+echo -e "\n--- Executando sync_html.sh "
+"$SCRIPTS_DIR/sync_html.sh" 
+echo "sync_html.sh concluído."
+
 echo -e "\n=================================================="
 echo "ORQUESTRAÇÃO COMPLETA DA CADEIA WRF-ICON CONCLUÍDA!"
 echo "=================================================="

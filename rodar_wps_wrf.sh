@@ -21,11 +21,11 @@ echo ">> 1. CONFIGURANDO AMBIENTE"
 
 if [[ ! -n $1 ]] ; then
     export DATE=$(date -u +%Y%m%d)00
-    export AMANHA=$(date -u -d "+1 day" +%Y%m%d)00
+    export AMANHA=$(date -u -d "${DATE:0:8} +36 hours" +%Y%m%d%H) 
 else
     export DATE=$1
 # Gerar AMANHA baseado na DATE
-    export AMANHA=$(date -u -d "${DATE:0:8} +1 day" +%Y%m%d)00
+    export AMANHA=$(date -u -d "${DATE:0:8} +36 hours"  +%Y%m%d%H)
 fi
 DATE_FORMATTED=$(echo $DATE | sed 's/\(....\)\(..\)\(..\)\(..\)/\1-\2-\3_\4:00:00/')
 AMANHA_FORMATTED=$(echo $AMANHA | sed 's/\(....\)\(..\)\(..\)\(..\)/\1-\2-\3_\4:00:00/')
@@ -41,7 +41,7 @@ export WRF_RUN_DIR="$RUN_DIR/run_wrf"
 export VTABLE_FILE="Vtable.ICONp"
 export NUM_CORES_WRF=6
 
-echo "   - Data da Simulação: $DATE"
+echo "   - Data da Simulação: $DATE até $AMANHA"
 echo "   - Diretório de Trabalho: $RUN_DIR"
 
 if [ ! -d "$ICON_DATA_DIR" ]; then
@@ -86,7 +86,8 @@ cd "$WPS_RUN_DIR"
 # --- 2.1. geogrid.exe ---
 echo "   -> 2.1. Executando geogrid.exe"
 ln -sf "$WPS_HOME/geogrid.exe" .
-cp -rf "$TEMPLATE_DIR/namelist.wps" .
+ln -sf ~/gis4wrf/datasets/geog/QNWFA_QNIFA_QNBCA_SIGMA_MONTHLY.dat .
+cp -rf "$TEMPLATE_DIR/namelist_chem.wps" namelist.wps
 echo ">> 2. ATUALIZANDO namelist.wps"
 sed -i "/start_date/s/'.*'/'${DATE_FORMATTED}', '${DATE_FORMATTED}'/" namelist.wps
 sed -i "/end_date/s/'.*'/'${AMANHA_FORMATTED}', '${AMANHA_FORMATTED}'/" namelist.wps
@@ -160,7 +161,7 @@ ln -sf "$WRF_HOME/main/wrf.exe" .
 
 
 # Cria links para todos arquivos que batem com os padrões
-for pattern in "ozon*" "*TBL*" "*DATA"; do
+for pattern in "ozon*" "*TBL*" "*DATA" "C*" "c*" "a*" "b*" "i*" "p3*" "t[e,r]*" ; do
     for file in $TEMPLATE_DIR/$pattern; do
         # Só cria se o arquivo realmente existir
         if [ -e "$file" ]; then
@@ -169,7 +170,7 @@ for pattern in "ozon*" "*TBL*" "*DATA"; do
     done
 done
 
-cp -rf $TEMPLATE_DIR/namelist.input .
+cp -rf $TEMPLATE_DIR/namelist_chem.input namelist.input 
 # Substitui cada linha relevante no namelist.input
 sed -i "/start_year/c\ start_year = ${START_YEAR}, ${START_YEAR}" namelist.input
 sed -i "/start_month/c\ start_month = ${START_MONTH}, ${START_MONTH}" namelist.input

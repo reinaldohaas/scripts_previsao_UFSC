@@ -4,7 +4,7 @@ cd /trabalho/icon/template/
 DATA=$(date -u +%Y%m%d)00
 echo $DATA
 # Horas de previsão: de 0 a 24 em passos de 3
-HORAS=$(seq -w 0 1 24)
+HORAS=$(seq -w 0 1 36)
 
 # Diretório de saída
 OUTFILE="urls.txt"

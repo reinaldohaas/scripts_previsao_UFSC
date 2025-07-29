@@ -188,11 +188,12 @@ def generate_main_index(root_path, forecasts):
             <p>Curso FSC7115 - Modelagem Numérica da Atmosfera</p>
         </header>
         <h2>Boas-vindas!</h2>
-       <p>Este é o espaço da Universidade Federal de Santa Catarina (UFSC), dedicado ao ensino e à pesquisa aplicada e ao desenvolvimento de soluções científicas e tecnológicas voltadas a problemas meteorológicos de alta relevância social. Este projeto nasce no contexto das disciplinas de Modelagem Numérica da Atmosfera e Meteorologia de Mesoescala, envolvendo de forma ativa os alunos da UFSC, que transformam conhecimento em ferramentas de impacto reala.</p>
-
-<p>Nosso objetivo atual é lançar o primeiro modelo brasileiro com capacidade operacional de prever lestadas — ventos costeiros intensos que afetam diretamente a segurança e o cotidiano da população do Sul do Brasil. Além disso, estamos construindo um aplicativo interativo e um agente de nowcasting, que integrarão previsões em tempo real e alertas inteligentes para ampliar a capacidade de resposta frente a eventos meteorológicos severos.</p>
-
-<p>Este espaço funciona como uma extensão viva do nosso trabalho em sala de aula, laboratório e campo. Aqui, ciência, formação acadêmica e compromisso público se encontram para gerar soluções inovadoras e socialmente relevantes.</p>
+        <p>Seja bem-vindo ao espaço do nosso grupo na Universidade Federal de Santa Catarina (UFSC), onde ciência, tecnologia e compromisso público se encontram para enfrentar desafios reais — e urgentes.</p>
+        <p>Estamos prestes a lançar o <strong>primeiro modelo brasileiro capaz de prever lestadas com precisão operacional</strong>, um marco para a meteorologia no Sul do país. A ferramenta estará disponível em breve em <a href="https://tempo.ufsc.br">www.tempo.ufsc.br</a>, ampliando a capacidade de previsão de ventos costeiros intensos que impactam o cotidiano de milhares de pessoas em Santa Catarina e no litoral brasileiro.</p>
+        <p>Esse avanço é resultado do esforço conjunto de pesquisadores, estudantes e técnicos. <strong>Todas as ideias desta página foram desenvolvidas por alunos dos cursos de Modelagem Numérica da Atmosfera e Meteorologia de Mesoescala da UFSC</strong>, refletindo a qualidade da formação em meteorologia na universidade, que hoje abriga uma das gerações mais qualificadas de sua história.</p>
+        <p>Este espaço é mais do que uma vitrine de projetos. É um convite à reflexão e à ação. Queremos construir pontes entre o conhecimento científico e a sociedade — e isso exige investimento, escuta e valorização.</p>
+        <hr>
+        <h2>Rodadas de Previsão Disponíveis</h2>
         {calendar_html}
         <footer>
             <p><strong>Contato:</strong> Reinaldo Haas | <a href="mailto:reinaldo.haas@ufsc.br">reinaldo.haas@ufsc.br</a></p>
